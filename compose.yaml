@@ -1,0 +1,42 @@
+services:
+  db:
+    build: ./db
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${DMD_DB_POSTGRES_PASS:?set DMD_DB_POSTGRES_PASS in .env}
+      - DMD_DB_API_PASS=${DMD_DB_API_PASS:?set DMD_DB_API_PASS in .env}
+    ports:
+      - "127.0.0.1:${DMD_DB_POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  indexer:
+    build: .
+    environment:
+      - DMD_DB_POSTGRES_PASS=${DMD_DB_POSTGRES_PASS:?set DMD_DB_POSTGRES_PASS in .env}
+      - POSTGRES_INSTANCE=db:5432
+      - RPC_URL=${RPC_URL:-https://rpc.bit.diamonds}
+      - DB_FILL_START_BLOCK=${DB_FILL_START_BLOCK:-}
+      - DB_FILL_STOP_BLOCK=${DB_FILL_STOP_BLOCK:-}
+      - DEV_TOOLS_LOG_DEBUG=${DEV_TOOLS_LOG_DEBUG:-false}
+      - DMD_REGISTRAR_CONTROLLER_ADDRESS=${DMD_REGISTRAR_CONTROLLER_ADDRESS:-}
+      - DMD_NAMES_ADDRESS=${DMD_NAMES_ADDRESS:-}
+    volumes:
+      - indexer-data:/var/lib/chain-indexer
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      - db
+    restart: on-failure
+
+volumes:
+  db-data:
+  indexer-data:
