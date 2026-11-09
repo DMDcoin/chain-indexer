@@ -1,0 +1,15 @@
+.git
+.github
+node_modules
+dist
+src/abi/contracts
+coverage
+db
+scripts
+*.md
+.env
+.env.*
+.mnemonic*
+.mainaddress*
+compose.yaml
+npm-debug.log*

@@ -1,0 +1,39 @@
+{
+  "name": "chain-indexer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Indexes DMD Diamond chain data into PostgreSQL",
+  "main": "dist/db/runFillDb.js",
+  "engines": {
+    "node": "^22"
+  },
+  "scripts": {
+    "typechain": "typechain --target web3-v1 --out-dir src/abi/contracts 'src/abi/json/*.json'",
+    "build": "npm run typechain && tsc && cp src/db/schema/schema.json dist/db/schema/schema.json",
+    "typecheck": "npm run typechain && tsc --noEmit",
+    "start": "node dist/db/runFillDb.js",
+    "dev": "npm run typechain && ts-node src/db/runFillDb.ts",
+    "create-mnemonic": "ts-node src/localnet/create-random-mnemonic.ts",
+    "db-apply-migrations": "./scripts/apply-migrations.sh"
+  },
+  "license": "AGPL-3.0-only",
+  "dependencies": {
+    "@databases/pg": "^5.4.1",
+    "@databases/pg-typed": "^4.4.1",
+    "bignumber.js": "^9.1.0",
+    "bip39": "^3.0.4",
+    "config": "^3.3.8",
+    "ethereumjs-wallet": "^1.0.2",
+    "moment": "^2.29.4",
+    "ts-command-line-args": "^2.3.1",
+    "web3": "1.10",
+    "web3-core": "1.10"
+  },
+  "devDependencies": {
+    "@typechain/web3-v1": "^6.0.7",
+    "@types/node": "^24.10.0",
+    "ts-node": "^10.9.1",
+    "typechain": "^8.3.2",
+    "typescript": "^4.8.4"
+  }
+}

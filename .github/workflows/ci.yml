@@ -1,0 +1,109 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: typecheck & build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+  images:
+    name: container images
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build indexer image
+        run: docker build -t chain-indexer:ci .
+
+      - name: Build database image
+        run: docker build -t chain-indexer-db:ci db
+
+  schema:
+    name: database schema
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Generate database passwords
+        run: |
+          for name in DMD_DB_POSTGRES_PASS DMD_DB_API_PASS; do
+            value=$(openssl rand -hex 24)
+            echo "::add-mask::$value"
+            echo "$name=$value" >> "$GITHUB_ENV"
+          done
+
+      - name: Apply migrations
+        run: |
+          docker compose up -d db
+          for i in $(seq 1 60); do
+            if docker compose exec -T db pg_isready -U postgres > /dev/null 2>&1; then
+              break
+            fi
+            sleep 2
+          done
+          sleep 3
+          ./scripts/apply-migrations.sh
+          applied=$(docker compose exec -T db psql -U postgres -At -c "SELECT count(*) FROM schema_migrations")
+          expected=$(ls db/migrations/*.sql | wc -l)
+          echo "applied=$applied expected=$expected"
+          test "$applied" -eq "$expected"
+
+  ci-required:
+    name: ci-required
+    if: always()
+    needs: [build, images, schema]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Check required jobs
+        env:
+          BUILD: ${{ needs.build.result }}
+          IMAGES: ${{ needs.images.result }}
+          SCHEMA: ${{ needs.schema.result }}
+        run: |
+          echo "build=$BUILD images=$IMAGES schema=$SCHEMA"
+          test "$BUILD" = "success"
+          test "$IMAGES" = "success"
+          test "$SCHEMA" = "success"
