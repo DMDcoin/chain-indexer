@@ -1,4 +1,4 @@
-FROM postgres:15.3
+FROM postgres:15.19
 
 
 # Copy the database initialization script.
